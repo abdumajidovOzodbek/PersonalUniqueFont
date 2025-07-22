@@ -19,13 +19,23 @@ function RecentGamesSection() {
   const [, setLocation] = useLocation();
   const [currentPage, setCurrentPage] = useState(1);
   const gamesPerPage = 5;
+  const [hasMorePages, setHasMorePages] = useState(true);
 
   const { data: games = [], isLoading } = useQuery({
     queryKey: ["/api/users/games", user?.id, currentPage],
     queryFn: async () => {
       if (!user?.id) return [];
-      const response = await apiRequest("GET", `/api/users/${user.id}/games?page=${currentPage}&limit=${gamesPerPage}`);
-      return response.json();
+      const response = await apiRequest("GET", `/api/users/${user.id}/games?page=${currentPage}&limit=${gamesPerPage + 1}`);
+      const data = await response.json();
+      
+      // If we get more than the page size, there are more pages
+      if (data.length > gamesPerPage) {
+        setHasMorePages(true);
+        return data.slice(0, gamesPerPage); // Return only the page size
+      } else {
+        setHasMorePages(false);
+        return data;
+      }
     },
     enabled: !!user?.id,
   });
@@ -157,7 +167,10 @@ function RecentGamesSection() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  onClick={() => {
+                    setCurrentPage(prev => Math.max(1, prev - 1));
+                    setHasMorePages(true); // Reset hasMorePages when going back
+                  }}
                   className="flex items-center gap-2"
                 >
                   <History className="w-4 h-4" />
@@ -169,7 +182,7 @@ function RecentGamesSection() {
                 Page {currentPage}
               </span>
               
-              {games.length === gamesPerPage && (
+              {hasMorePages && (
                 <Button
                   variant="outline"
                   size="sm"
