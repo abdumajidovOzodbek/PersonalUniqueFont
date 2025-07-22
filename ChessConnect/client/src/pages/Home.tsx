@@ -9,10 +9,178 @@ import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import Navigation from "@/components/Navigation";
-import RecentMatches from "@/components/RecentMatches";
+
 import { Play, Clock, Trophy, Target, History, Users } from "lucide-react";
 import { useLocation } from "wouter";
 import type { Game, User } from "@shared/schema";
+
+function RecentGamesSection() {
+  const { user } = useAuth();
+  const [, setLocation] = useLocation();
+  const [currentPage, setCurrentPage] = useState(1);
+  const gamesPerPage = 5;
+
+  const { data: games = [], isLoading } = useQuery({
+    queryKey: ["/api/users/games", user?.id, currentPage],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const response = await apiRequest("GET", `/api/users/${user.id}/games?page=${currentPage}&limit=${gamesPerPage}`);
+      return response.json();
+    },
+    enabled: !!user?.id,
+  });
+
+  const getGameResult = (game: Game) => {
+    if (game.status !== 'completed') return 'In Progress';
+    if (game.result === 'draw') return 'Draw';
+    
+    const isWhite = game.whitePlayerId === user?.id;
+    if (game.result === 'white_wins') {
+      return isWhite ? 'Win' : 'Loss';
+    } else if (game.result === 'black_wins') {
+      return isWhite ? 'Loss' : 'Win';
+    }
+    return 'Unknown';
+  };
+
+  const getResultBadgeVariant = (result: string) => {
+    switch (result) {
+      case 'Win':
+        return 'default';
+      case 'Loss':
+        return 'destructive';
+      case 'Draw':
+        return 'secondary';
+      default:
+        return 'outline';
+    }
+  };
+
+  const formatTimeControl = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    if (minutes >= 60) {
+      const hours = Math.floor(minutes / 60);
+      const remainingMinutes = minutes % 60;
+      return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+    }
+    return `${minutes}m`;
+  };
+
+  const handleViewGame = (gameId: string) => {
+    setLocation(`/game/${gameId}`);
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <History className="w-5 h-5 mr-2" />
+            Recent Games
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg animate-pulse">
+                <div className="flex items-center space-x-3">
+                  <div className="w-16 h-6 bg-gray-200 rounded"></div>
+                  <div className="w-24 h-4 bg-gray-200 rounded"></div>
+                </div>
+                <div className="w-20 h-4 bg-gray-200 rounded"></div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center">
+          <History className="w-5 h-5 mr-2" />
+          Recent Games
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {games.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            <History className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p>No games played yet</p>
+            <p className="text-sm">Start your first match above!</p>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-3">
+              {games.map((game: Game) => {
+                const result = getGameResult(game);
+                const isWhite = game.whitePlayerId === user?.id;
+                const playerColor = isWhite ? 'White' : 'Black';
+                const opponentName = isWhite ? 'Black Player' : 'White Player';
+                
+                return (
+                  <div
+                    key={game._id || game.id}
+                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                      <div>
+                        <p className="font-medium">vs {opponentName}</p>
+                        <p className="text-sm text-gray-500">
+                          {playerColor} • {formatTimeControl(game.timeControl || 600)} • {new Date(game.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant={getResultBadgeVariant(result)}>
+                        {result}
+                      </Badge>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleViewGame(game._id?.toString() || game.id)}
+                      >
+                        View
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              
+              <span className="text-sm text-gray-600">
+                Page {currentPage}
+              </span>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => prev + 1)}
+                disabled={games.length < gamesPerPage}
+              >
+                Next
+              </Button>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Home() {
   const { user, isLoading: authLoading } = useAuth();
@@ -293,66 +461,11 @@ export default function Home() {
             </Card>
 
             {/* Recent Games */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <History className="w-5 h-5 mr-2" />
-                  Recent Games
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {recentGames && recentGames.length > 0 ? (
-                  <div className="space-y-3">
-                    {recentGames.map((game: Game, index: number) => (
-                      <div key={game._id || game.id || `game-${index}`} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-2 h-2 rounded-full bg-gray-400"></div>
-                          <div>
-                            <p className="font-medium">
-                              vs {game.whitePlayerId === user?.id ? 'Black Player' : 'White Player'}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              {game.timeControl}min • {new Date(game.createdAt!).toLocaleDateString()}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Badge 
-                            variant={
-                              game.result === 'draw' ? 'secondary' :
-                              (game.result === 'white_wins' && game.whitePlayerId === user?.id) ||
-                              (game.result === 'black_wins' && game.blackPlayerId === user?.id)
-                                ? 'default' : 'destructive'
-                            }
-                          >
-                            {game.result === 'draw' ? 'Draw' :
-                             (game.result === 'white_wins' && game.whitePlayerId === user?.id) ||
-                             (game.result === 'black_wins' && game.blackPlayerId === user?.id)
-                               ? 'Win' : 'Loss'}
-                          </Badge>
-                          <Button variant="outline" size="sm">
-                            View
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <History className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>No games played yet</p>
-                    <p className="text-sm">Start your first match above!</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <RecentGamesSection />
           </div>
 
           {/* Sidebar */}
           <div className="lg:col-span-4 space-y-6">
-            {/* Recent Matches */}
-            <RecentMatches />
-
             {/* Player Stats */}
             <Card>
               <CardHeader>
