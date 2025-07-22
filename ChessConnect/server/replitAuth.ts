@@ -33,21 +33,25 @@ export function getSession() {
     collectionName: 'sessions',
     touchAfter: 24 * 3600, // lazy session update
     autoRemove: 'native', // Let MongoDB handle session cleanup
-    stringify: false // Don't stringify session data
+    stringify: false, // Don't stringify session data
+    crypto: {
+      secret: process.env.SESSION_SECRET || 'fallback-secret-key-for-dev'
+    }
   });
   
   return session({
     secret: process.env.SESSION_SECRET || 'fallback-secret-key-for-dev',
     store: sessionStore,
     resave: false,
-    saveUninitialized: false, // Don't save uninitialized sessions
+    saveUninitialized: true, // Save uninitialized sessions to ensure sid is generated
     rolling: true,
     name: 'chess.sid',
-    genid: (req) => {
-      // Generate a unique session ID with timestamp to ensure uniqueness
-      const timestamp = Date.now();
-      const random = crypto.randomBytes(16).toString('hex');
-      return `sess_${timestamp}_${random}`;
+    genid: () => {
+      // Generate a more robust unique session ID
+      const timestamp = Date.now().toString(36);
+      const random1 = crypto.randomBytes(8).toString('hex');
+      const random2 = Math.random().toString(36).substring(2);
+      return `sess_${timestamp}_${random1}_${random2}`;
     },
     cookie: {
       httpOnly: true,
