@@ -444,16 +444,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Game not found" });
       }
 
+      if (game.status !== 'active') {
+        return res.status(400).json({ message: "Game is not active" });
+      }
+
       const isPlayer = game.whitePlayerId === userId || game.blackPlayerId === userId;
       if (!isPlayer) {
         return res.status(403).json({ message: "Not a player in this game" });
       }
 
-      // For now, just return success. In a full implementation, you'd store the draw offer
+      // Store draw offer
+      await storage.addDrawOffer(gameId, userId);
       res.json({ message: "Draw offer sent" });
     } catch (error) {
       console.error("Error offering draw:", error);
       res.status(500).json({ message: "Failed to offer draw" });
+    }
+  });
+
+  app.post('/api/games/:id/draw-response', isAuthenticated, async (req: any, res) => {
+    try {
+      const gameId = req.params.id;
+      const userId = req.user.claims.sub;
+      const { accept } = req.body;
+
+      const game = await storage.getGame(gameId);
+      if (!game) {
+        return res.status(404).json({ message: "Game not found" });
+      }
+
+      if (game.status !== 'active') {
+        return res.status(400).json({ message: "Game is not active" });
+      }
+
+      const isPlayer = game.whitePlayerId === userId || game.blackPlayerId === userId;
+      if (!isPlayer) {
+        return res.status(403).json({ message: "Not a player in this game" });
+      }
+
+      // Remove draw offers
+      await storage.removeDrawOffers(gameId);
+
+      if (accept) {
+        // End game in draw
+        const updatedGame = await storage.updateGame(gameId, {
+          status: 'completed',
+          result: 'draw',
+        });
+
+        // Update player stats
+        if (game.whitePlayerId && !game.whitePlayerId.startsWith('bot_')) {
+          await storage.updateUserStats(game.whitePlayerId, 'draw');
+        }
+        if (game.blackPlayerId && !game.blackPlayerId.startsWith('bot_')) {
+          await storage.updateUserStats(game.blackPlayerId, 'draw');
+        }
+
+        res.json({ accepted: true, game: updatedGame });
+      } else {
+        res.json({ accepted: false });
+      }
+    } catch (error) {
+      console.error("Error responding to draw:", error);
+      res.status(500).json({ message: "Failed to respond to draw" });
+    }
+  });
+
+  app.get('/api/games/:id/draw-offers', isAuthenticated, async (req: any, res) => {
+    try {
+      const gameId = req.params.id;
+      const userId = req.user.claims.sub;
+
+      const game = await storage.getGame(gameId);
+      if (!game) {
+        return res.status(404).json({ message: "Game not found" });
+      }
+
+      const isPlayer = game.whitePlayerId === userId || game.blackPlayerId === userId;
+      if (!isPlayer) {
+        return res.status(403).json({ message: "Not a player in this game" });
+      }
+
+      // Get draw offers from opponent
+      const opponentId = game.whitePlayerId === userId ? game.blackPlayerId : game.whitePlayerId;
+      const drawOffers = await storage.getDrawOffers(gameId, opponentId);
+      
+      res.json(drawOffers);
+    } catch (error) {
+      console.error("Error fetching draw offers:", error);
+      res.status(500).json({ message: "Failed to fetch draw offers" });
     }
   });
 

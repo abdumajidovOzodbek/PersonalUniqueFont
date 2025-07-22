@@ -1,9 +1,18 @@
-
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Button } from "./ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "./ui/alert-dialog";
 
 interface GameControlsProps {
   gameId: string | undefined;
@@ -14,6 +23,13 @@ interface GameControlsProps {
 export default function GameControls({ gameId, gameStatus, className }: GameControlsProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // Check for pending draw offers
+  const { data: drawOffers = [] } = useQuery({
+    queryKey: ["/api/games", gameId, "draw-offers"],
+    enabled: !!gameId && gameId !== 'undefined' && gameStatus === 'active',
+    refetchInterval: 3000,
+  });
 
   const resignMutation = useMutation({
     mutationFn: async () => {
@@ -91,7 +107,7 @@ export default function GameControls({ gameId, gameStatus, className }: GameCont
         >
           Offer Draw
         </Button>
-        
+
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button variant="destructive" disabled={resignMutation.isPending}>

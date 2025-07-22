@@ -15,6 +15,7 @@ import {
   type MatchmakingEntry,
   type InsertMatchmakingEntry,
 } from "@shared/schema";
+import { Schema, model } from "mongoose";
 import { connectToMongoDB } from "./mongoose";
 
 export interface IStorage {
@@ -45,6 +46,11 @@ export interface IStorage {
   
   // User stats
   updateUserStats(userId: string, result: 'win' | 'loss' | 'draw'): Promise<void>;
+  
+  // Draw offers
+  addDrawOffer(gameId: string, playerId: string): Promise<void>;
+  getDrawOffers(gameId: string, fromPlayerId?: string): Promise<any[]>;
+  removeDrawOffers(gameId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -328,6 +334,40 @@ export class DatabaseStorage implements IStorage {
 
     await UserModel.updateOne({ id: userId }, updates).exec();
   }
+
+  // Draw offers
+  async addDrawOffer(gameId: string, playerId: string): Promise<void> {
+    await DrawOfferModel.findOneAndUpdate(
+      { gameId, playerId },
+      { gameId, playerId, createdAt: new Date() },
+      { upsert: true }
+    ).exec();
+  }
+
+  async getDrawOffers(gameId: string, fromPlayerId?: string): Promise<any[]> {
+    const query: any = { gameId };
+    if (fromPlayerId) {
+      query.playerId = fromPlayerId;
+    }
+    
+    const offers = await DrawOfferModel.find(query).exec();
+    return offers.map(offer => offer.toObject());
+  }
+
+  async removeDrawOffers(gameId: string): Promise<void> {
+    await DrawOfferModel.deleteMany({ gameId }).exec();
+  }
 }
+
+// Draw Offer Schema
+const drawOfferSchema = new Schema({
+  gameId: { type: String, required: true },
+  playerId: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now },
+});
+
+drawOfferSchema.index({ gameId: 1, playerId: 1 }, { unique: true });
+
+const DrawOfferModel = model('DrawOffer', drawOfferSchema);
 
 export const storage = new DatabaseStorage();

@@ -147,6 +147,26 @@ export default function Game() {
           <div className="lg:col-span-8">
             <Card>
               <CardContent className="p-6">
+                {/* Game Result */}
+                {gameData.status === 'completed' && (
+                  <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200 text-center">
+                    <h3 className="font-semibold text-lg mb-2">Game Over</h3>
+                    <p className="text-gray-700">
+                      {gameData.result === 'white_wins' ? 'White wins!' :
+                       gameData.result === 'black_wins' ? 'Black wins!' :
+                       gameData.result === 'draw' ? 'Game ended in a draw' :
+                       'Game ended'}
+                    </p>
+                    {gameData.result && gameData.result !== 'draw' && (
+                      <p className="text-sm text-gray-600 mt-1">
+                        {((gameData.result === 'white_wins' && isWhitePlayer) ||
+                          (gameData.result === 'black_wins' && isBlackPlayer)) ? 
+                          'You won!' : 'You lost'}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {/* Opponent Info */}
                 <PlayerInfo
                   player={opponent}
@@ -155,6 +175,7 @@ export default function Game() {
                     (gameData.currentTurn === 'white' && !isWhitePlayer) ||
                     (gameData.currentTurn === 'black' && !isBlackPlayer)
                   }
+                  gameStatus={gameData.status}
                   className="mb-6"
                 />
 
@@ -180,6 +201,7 @@ export default function Game() {
                     (gameData.currentTurn === 'white' && isWhitePlayer) ||
                     (gameData.currentTurn === 'black' && isBlackPlayer)
                   }
+                  gameStatus={gameData.status}
                   isCurrentPlayer={true}
                 />
               </CardContent>
