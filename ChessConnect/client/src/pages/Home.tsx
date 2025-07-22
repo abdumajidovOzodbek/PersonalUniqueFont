@@ -60,10 +60,7 @@ export default function Home() {
         // Poll for match every 3 seconds
         const pollInterval = setInterval(async () => {
           try {
-            const response = await apiRequest("POST", "/api/matchmaking", {
-              timeControl: timeControl,
-              ratingRange: 200,
-            });
+            const response = await apiRequest("GET", "/api/matchmaking/status");
             const result = await response.json();
 
             if (result.matched) {

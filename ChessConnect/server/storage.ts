@@ -41,6 +41,7 @@ export interface IStorage {
   addToMatchmaking(entry: InsertMatchmakingEntry): Promise<MatchmakingEntry>;
   findMatchmakingOpponent(playerId: string, timeControl: number, ratingRange: number): Promise<MatchmakingEntry | undefined>;
   removeFromMatchmaking(playerId: string): Promise<void>;
+  isPlayerInQueue(playerId: string): Promise<boolean>;
   
   // User stats
   updateUserStats(userId: string, result: 'win' | 'loss' | 'draw'): Promise<void>;
@@ -297,6 +298,11 @@ export class DatabaseStorage implements IStorage {
 
   async removeFromMatchmaking(playerId: string): Promise<void> {
     await MatchmakingQueueModel.deleteMany({ playerId }).exec();
+  }
+
+  async isPlayerInQueue(playerId: string): Promise<boolean> {
+    const entry = await MatchmakingQueueModel.findOne({ playerId }).exec();
+    return !!entry;
   }
 
   // User stats

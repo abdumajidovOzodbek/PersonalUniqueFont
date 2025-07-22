@@ -510,10 +510,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       if (opponent) {
+        // Randomly assign colors to make it fair
+        const isCurrentPlayerWhite = Math.random() > 0.5;
+        
         // Create game with found opponent
         const game = await storage.createGame({
-          whitePlayerId: userId,
-          blackPlayerId: opponent.playerId,
+          whitePlayerId: isCurrentPlayerWhite ? userId : opponent.playerId,
+          blackPlayerId: isCurrentPlayerWhite ? opponent.playerId : userId,
           timeControl: entryData.timeControl,
           whiteTimeRemaining: entryData.timeControl,
           blackTimeRemaining: entryData.timeControl,
@@ -539,6 +542,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error with matchmaking:", error);
       res.status(500).json({ message: "Failed to process matchmaking" });
+    }
+  });
+
+  app.get('/api/matchmaking/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Check if player is still in queue
+      const inQueue = await storage.isPlayerInQueue(userId);
+      
+      if (!inQueue) {
+        // Player might have been matched, check for recent games
+        const recentGames = await storage.getUserGames(userId, 1);
+        if (recentGames.length > 0) {
+          const latestGame = recentGames[0];
+          // Check if this game was created in the last 30 seconds (indicating a fresh match)
+          const gameAge = Date.now() - new Date(latestGame.createdAt).getTime();
+          if (gameAge < 30000) {
+            return res.json({ 
+              matched: true, 
+              game: { 
+                ...latestGame, 
+                id: latestGame._id?.toString() || latestGame.id,
+                _id: latestGame._id?.toString() || latestGame.id 
+              } 
+            });
+          }
+        }
+      }
+      
+      res.json({ matched: false, inQueue });
+    } catch (error) {
+      console.error("Error checking matchmaking status:", error);
+      res.status(500).json({ message: "Failed to check matchmaking status" });
     }
   });
 
