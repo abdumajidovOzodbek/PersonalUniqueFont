@@ -1,0 +1,76 @@
+rror creating guest user: MongoServerError: E11000 duplicate key error collection: test.sessions index: sid_1 dup key: { sid: null }
+    at UpdateOneOperation.execute (/home/runner/workspace/ChessConnect/node_modules/mongodb/src/operations/update.ts:160:32)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async tryOperation (/home/runner/workspace/ChessConnect/node_modules/mongodb/src/operations/execute_operation.ts:283:14)
+    at async executeOperation (/home/runner/workspace/ChessConnect/node_modules/mongodb/src/operations/execute_operation.ts:115:12)
+    at async Collection.updateOne (/home/runner/workspace/ChessConnect/node_modules/mongodb/src/collection.ts:371:12)
+    at async <anonymous> (/home/runner/workspace/ChessConnect/node_modules/connect-mongo/src/lib/MongoStore.ts:383:25) {
+  errorLabelSet: Set(0) {},
+  errorResponse: {
+    index: 0,
+    code: 11000,
+    errmsg: 'E11000 duplicate key error collection: test.sessions index: sid_1 dup key: { sid: null }',
+    keyPattern: { sid: 1 },
+    keyValue: { sid: null }
+  },
+  index: 0,
+  code: 11000,
+  keyPattern: { sid: 1 },
+  keyValue: { sid: null }
+}
+4:49:09 PM [express] POST /api/auth/guest 500 in 684ms :: {"message":"Failed to create guest session…
+Error saving guest session: MongoServerError: E11000 duplicate key error collection: test.sessions index: sid_1 dup key: { sid: null }
+    at UpdateOneOperation.execute (/home/runner/workspace/ChessConnect/node_modules/mongodb/src/operations/update.ts:160:32)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async tryOperation (/home/runner/workspace/ChessConnect/node_modules/mongodb/src/operations/execute_operation.ts:283:14)
+    at async executeOperation (/home/runner/workspace/ChessConnect/node_modules/mongodb/src/operations/execute_operation.ts:115:12)
+    at async Collection.updateOne (/home/runner/workspace/ChessConnect/node_modules/mongodb/src/collection.ts:371:12)
+    at async <anonymous> (/home/runner/workspace/ChessConnect/node_modules/connect-mongo/src/lib/MongoStore.ts:383:25) {
+  errorLabelSet: Set(0) {},
+  errorResponse: {
+    index: 0,
+    code: 11000,
+    errmsg: 'E11000 duplicate key error collection: test.sessions index: sid_1 dup key: { sid: null }',
+    keyPattern: { sid: 1 },
+    keyValue: { sid: null }
+  },
+  index: 0,
+  code: 11000,
+  keyPattern: { sid: 1 },
+  keyValue: { sid: null }
+}
+Error creating guest user: MongoServerError: E11000 duplicate key error collection: test.sessions index: sid_1 dup key: { sid: null }
+    at UpdateOneOperation.execute (/home/runner/workspace/ChessConnect/node_modules/mongodb/src/operations/update.ts:160:32)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async tryOperation (/home/runner/workspace/ChessConnect/node_modules/mongodb/src/operations/execute_operation.ts:283:14)
+    at async executeOperation (/home/runner/workspace/ChessConnect/node_modules/mongodb/src/operations/execute_operation.ts:115:12)
+    at async Collection.updateOne (/home/runner/workspace/ChessConnect/node_modules/mongodb/src/collection.ts:371:12)
+    at async <anonymous> (/home/runner/workspace/ChessConnect/node_modules/connect-mongo/src/lib/MongoStore.ts:383:25) {
+  errorLabelSet: Set(0) {},
+  errorResponse: {
+    index: 0,
+    code: 11000,
+    errmsg: 'E11000 duplicate key error collection: test.sessions index: sid_1 dup key: { sid: null }',
+    keyPattern: { sid: 1 },
+    keyValue: { sid: null }
+  },
+  index: 0,
+  code: 11000,
+  keyPattern: { sid: 1 },
+  keyValue: { sid: null }
+}
+4:49:17 PM [express] POST /api/auth/guest 500 in 691ms :: {"message":"Failed to create guest session…
+express deprecated req.host: Use req.hostname instead file:/home/runner/workspace/ChessConnect/node_modules/openid-client/build/passport.js:224:49
+4:49:19 PM [express] GET /api/login 302 in 468ms
+Error [ERR_HTTP_HEADERS_SENT]: Cannot set headers after they are sent to the client
+    at ServerResponse.setHeader (node:_http_outgoing:655:11)
+    at ServerResponse.header (/home/runner/workspace/ChessConnect/node_modules/express/lib/response.js:794:10)
+    at ServerResponse.json (/home/runner/workspace/ChessConnect/node_modules/express/lib/response.js:275:10)
+    at ServerResponse.res.json (/home/runner/workspace/ChessConnect/server/index.ts:17:28)
+    at <anonymous> (/home/runner/workspace/ChessConnect/server/index.ts:46:24)
+    at Layer.handle_error (/home/runner/workspace/ChessConnect/node_modules/express/lib/router/layer.js:71:5)
+    at trim_prefix (/home/runner/workspace/ChessConnect/node_modules/express/lib/router/index.js:326:13)
+    at /home/runner/workspace/ChessConnect/node_modules/express/lib/router/index.js:286:9
+    at Function.process_params (/home/runner/workspace/ChessConnect/node_modules/express/lib/router/index.js:346:12)
+    at Immediate.next (/home/runner/workspace/ChessConnect/node_modules/express/lib/router/index.js:280:10)
+    at process.processImmediate (node:internal/timers:485:21)
