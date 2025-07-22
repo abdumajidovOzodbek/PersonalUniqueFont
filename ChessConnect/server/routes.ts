@@ -30,8 +30,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   });
 
-  // Initialize Object Storage client
-  const objectStorageClient = new Client();
+  // Initialize Object Storage client with error handling
+  let objectStorageClient: Client | null = null;
+  try {
+    objectStorageClient = new Client();
+  } catch (error) {
+    console.warn("Object Storage not available:", error);
+  }
 
   // Auth middleware
   await setupAuth(app);
@@ -695,6 +700,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Image upload route
   app.post('/api/upload/profile-image', isAuthenticated, upload.single('image'), async (req: any, res) => {
     try {
+      if (!objectStorageClient) {
+        return res.status(503).json({ message: "Object Storage not available. Please configure Object Storage in your Replit workspace." });
+      }
+
       if (!req.file) {
         return res.status(400).json({ message: "No image file provided" });
       }
@@ -724,6 +733,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Serve images from Object Storage
   app.get('/api/images/*', async (req, res) => {
     try {
+      if (!objectStorageClient) {
+        return res.status(503).json({ message: "Object Storage not available" });
+      }
+
       const fileName = req.params[0];
       
       // Download from Object Storage
