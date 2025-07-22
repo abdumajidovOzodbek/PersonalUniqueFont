@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -10,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import Navigation from "@/components/Navigation";
+import RecentMatches from "@/components/RecentMatches";
 import { Play, Clock, Trophy, Target, History, Users } from "lucide-react";
 import { useLocation } from "wouter";
 import type { Game, User } from "@shared/schema";
@@ -350,6 +350,9 @@ export default function Home() {
 
           {/* Sidebar */}
           <div className="lg:col-span-4 space-y-6">
+            {/* Recent Matches */}
+            <RecentMatches />
+
             {/* Player Stats */}
             <Card>
               <CardHeader>

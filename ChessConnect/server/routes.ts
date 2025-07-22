@@ -196,7 +196,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/users/:userId/games', isAuthenticated, async (req, res) => {
     try {
       const userId = req.params.userId;
-      const games = await storage.getUserGames(userId);
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const games = await storage.getUserGames(userId, limit, page);
       res.json(games);
     } catch (error) {
       console.error("Error fetching user games:", error);

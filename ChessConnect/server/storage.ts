@@ -28,7 +28,7 @@ export interface IStorage {
   getGame(id: string): Promise<Game | undefined>;
   getGameWithPlayers(id: string): Promise<Game & { whitePlayer: User | null; blackPlayer: User | null } | undefined>;
   updateGame(id: string, updates: Partial<InsertGame>): Promise<Game>;
-  getUserGames(userId: string, limit?: number): Promise<Game[]>;
+  getUserGames(userId: string, limit?: number, page?: number): Promise<Game[]>;
   
   // Game move operations
   addGameMove(move: InsertGameMove): Promise<GameMove>;
@@ -176,7 +176,8 @@ export class DatabaseStorage implements IStorage {
     } as Game;
   }
 
-  async getUserGames(userId: string, limit = 10): Promise<Game[]> {
+  async getUserGames(userId: string, limit = 10, page = 1): Promise<Game[]> {
+    const skip = (page - 1) * limit;
     const games = await GameModel
       .find({
         $or: [
@@ -185,6 +186,7 @@ export class DatabaseStorage implements IStorage {
         ]
       })
       .sort({ createdAt: -1 })
+      .skip(skip)
       .limit(limit)
       .exec();
       
@@ -343,7 +345,6 @@ export class DatabaseStorage implements IStorage {
     const users = await UserModel
       .find({
         gamesPlayed: { $gt: 0 }, // Only include users who have played at least one game
-        id: { $not: /^guest_/ } // Exclude guest users from leaderboard
       })
       .sort({ rating: -1, gamesPlayed: -1 }) // Sort by rating desc, then by games played desc
       .limit(limit)
