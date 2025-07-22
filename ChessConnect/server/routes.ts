@@ -11,14 +11,13 @@ import {
 import { Chess } from "chess.js";
 import { ChessBot } from "./bot";
 import multer from "multer";
-import { Client } from "@replit/object-storage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Configure multer for file uploads
   const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
-      fileSize: 5 * 1024 * 1024, // 5MB limit
+      fileSize: 2 * 1024 * 1024, // 2MB limit for base64 storage
     },
     fileFilter: (req, file, cb) => {
       // Only allow image files
@@ -29,30 +28,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     },
   });
-
-  // Initialize Object Storage client with error handling
-  let objectStorageClient: Client | null = null;
-  try {
-    // Check if bucket is configured
-    const { readFileSync, existsSync } = await import('fs');
-    const { join } = await import('path');
-    const replitConfigPath = join(process.cwd(), '.replit');
-    
-    let hasBucketConfig = false;
-    if (existsSync(replitConfigPath)) {
-      const configContent = readFileSync(replitConfigPath, 'utf8');
-      hasBucketConfig = configContent.includes('[objectStorage]') && configContent.includes('defaultBucketID');
-    }
-    
-    if (hasBucketConfig) {
-      objectStorageClient = new Client();
-      console.log("Object Storage initialized successfully");
-    } else {
-      console.warn("Object Storage not configured. Please create a bucket in the Tools pane.");
-    }
-  } catch (error) {
-    console.warn("Object Storage not available:", error);
-  }
 
   // Auth middleware
   await setupAuth(app);
@@ -716,80 +691,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Image upload route
   app.post('/api/upload/profile-image', isAuthenticated, upload.single('image'), async (req: any, res) => {
     try {
-      if (!objectStorageClient) {
-        return res.status(503).json({ 
-          message: "Object Storage not available. Please create a bucket in Tools > Object Storage to enable profile image uploads." 
-        });
-      }
-
       if (!req.file) {
         return res.status(400).json({ message: "No image file provided" });
       }
 
       const userId = req.user.claims.sub;
-      const fileExtension = req.file.originalname.split('.').pop() || 'jpg';
-      const fileName = `profile-images/${userId}-${Date.now()}.${fileExtension}`;
+      
+      // Convert image to base64
+      const base64Image = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
 
-      // Upload to Object Storage
-      const { ok, error } = await objectStorageClient.uploadFromBytes(fileName, req.file.buffer);
+      // Update user's profile with base64 image
+      const updatedUser = await storage.updateUserProfile(userId, {
+        profileImageUrl: base64Image,
+      });
 
-      if (!ok) {
-        console.error("Error uploading to Object Storage:", error);
-        return res.status(500).json({ message: "Failed to upload image" });
-      }
-
-      // Generate the URL for the uploaded image
-      const imageUrl = `/api/images/${fileName}`;
-
-      res.json({ imageUrl });
+      res.json({ imageUrl: base64Image });
     } catch (error) {
       console.error("Error uploading profile image:", error);
       res.status(500).json({ message: "Failed to upload profile image" });
     }
   });
 
-  // Serve images from Object Storage
-  app.get('/api/images/*', async (req, res) => {
-    try {
-      if (!objectStorageClient) {
-        return res.status(503).json({ message: "Object Storage not available" });
-      }
-
-      const fileName = req.params[0];
-      
-      // Download from Object Storage
-      const { ok, value, error } = await objectStorageClient.downloadAsBytes(fileName);
-
-      if (!ok) {
-        return res.status(404).json({ message: "Image not found" });
-      }
-
-      // Set appropriate content type
-      const extension = fileName.split('.').pop()?.toLowerCase();
-      let contentType = 'image/jpeg'; // default
-      
-      switch (extension) {
-        case 'png':
-          contentType = 'image/png';
-          break;
-        case 'gif':
-          contentType = 'image/gif';
-          break;
-        case 'webp':
-          contentType = 'image/webp';
-          break;
-        default:
-          contentType = 'image/jpeg';
-      }
-
-      res.set('Content-Type', contentType);
-      res.set('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
-      res.send(value);
-    } catch (error) {
-      console.error("Error serving image:", error);
-      res.status(500).json({ message: "Failed to serve image" });
-    }
-  });
+  
 
   // Profile update routes
   app.put('/api/profile/username', isAuthenticated, async (req: any, res) => {

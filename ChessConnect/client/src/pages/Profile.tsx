@@ -63,13 +63,11 @@ export default function Profile() {
       return response.json();
     },
     onSuccess: async (data) => {
-      // Update user profile with the new image URL
-      const response = await apiRequest("PUT", "/api/profile/picture", {
+      // The upload endpoint now returns the user object directly
+      queryClient.setQueryData(["/api/auth/user"], (oldData: any) => ({
+        ...oldData,
         profileImageUrl: data.imageUrl,
-      });
-      const updatedUser = await response.json();
-
-      queryClient.setQueryData(["/api/auth/user"], updatedUser);
+      }));
       setProfileImageUrl(data.imageUrl);
       setSelectedFile(null);
       setPreviewUrl(null);
