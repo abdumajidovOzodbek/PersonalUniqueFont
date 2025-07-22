@@ -393,6 +393,41 @@ export class DatabaseStorage implements IStorage {
       profileImageUrl: userObj.profileImageUrl || undefined,
     } as User;
   }
+
+  // Draw offer methods
+  async addDrawOffer(gameId: string, playerId: string): Promise<void> {
+    try {
+      const drawOffer = new DrawOfferModel({
+        gameId,
+        playerId,
+        createdAt: new Date(),
+      });
+      await drawOffer.save();
+    } catch (error: any) {
+      // Ignore duplicate key errors (player already has pending draw offer)
+      if (error.code !== 11000) {
+        throw error;
+      }
+    }
+  }
+
+  async getDrawOffers(gameId: string, fromPlayerId?: string): Promise<any[]> {
+    const query: any = { gameId };
+    if (fromPlayerId) {
+      query.playerId = fromPlayerId;
+    }
+
+    const offers = await DrawOfferModel.find(query).exec();
+    return offers.map(offer => ({
+      gameId: offer.gameId,
+      playerId: offer.playerId,
+      createdAt: offer.createdAt,
+    }));
+  }
+
+  async removeDrawOffers(gameId: string): Promise<void> {
+    await DrawOfferModel.deleteMany({ gameId }).exec();
+  }
 }
 
 // Draw Offer Schema
