@@ -26,7 +26,7 @@ const getOidcConfig = memoize(
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
   const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://ozod:1234ozod@cluster0.51dlocb.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
-  
+
   const sessionStore = MongoStore.create({
     mongoUrl: MONGODB_URI,
     ttl: sessionTtl / 1000, // MongoStore expects TTL in seconds
@@ -38,7 +38,7 @@ export function getSession() {
       secret: process.env.SESSION_SECRET || 'fallback-secret-key-for-dev'
     }
   });
-  
+
   return session({
     secret: process.env.SESSION_SECRET || 'fallback-secret-key-for-dev',
     store: sessionStore,
@@ -152,7 +152,7 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   }
 
   const user = req.session.passport.user as any;
-  
+
   if (!user || !user.expires_at) {
     return res.status(401).json({ message: "Unauthorized" });
   }
@@ -187,3 +187,41 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     return;
   }
 };
+
+export function createSessionMiddleware() {
+  const sessionStore = MongoStore.create({
+    mongoUrl: process.env.DATABASE_URL!,
+    dbName: 'test',
+    collectionName: 'sessions',
+    touchAfter: 24 * 3600, // lazy session update
+    autoRemove: 'native', // Let MongoDB handle session cleanup
+    stringify: false // Don't stringify session data
+  });
+
+  // Handle session store errors
+  sessionStore.on('error', (error) => {
+    console.error('Session store error:', error);
+  });
+
+  return session({
+    secret: process.env.SESSION_SECRET || 'fallback-secret-key-for-dev',
+    store: sessionStore,
+    resave: false,
+    saveUninitialized: false, // Don't save uninitialized sessions
+    rolling: true,
+    name: 'chess.sid',
+    genid: (req) => {
+      // Generate a guaranteed unique session ID
+      const timestamp = Date.now();
+      const random = crypto.randomBytes(16).toString('hex');
+      const counter = Math.floor(Math.random() * 10000);
+      return `sess_${timestamp}_${random}_${counter}`;
+    },
+    cookie: {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      sameSite: 'lax'
+    },
+  });
+}

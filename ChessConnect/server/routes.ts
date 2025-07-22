@@ -27,22 +27,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Guest user creation
-  app.post('/api/auth/guest', async (req: any, res) => {
+  app.post("/api/auth/guest", async (req, res) => {
     try {
       const guestId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
-      // Ensure session exists and has a proper ID
-      if (!req.session || !req.sessionID) {
-        console.error("Session not properly initialized:", { session: !!req.session, sessionID: req.sessionID });
-        return res.status(500).json({ message: "Session not initialized" });
+
+      // Force session creation if it doesn't exist
+      if (!req.session) {
+        return res.status(500).json({ message: "Session middleware not properly configured" });
       }
-      
-      // Clear existing session data but keep the session itself
-      if (req.session.passport) {
-        req.session.passport = undefined;
+
+      // Regenerate session to ensure we have a valid session ID
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err: any) => {
+          if (err) {
+            console.error("Error regenerating session:", err);
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      // Verify session ID exists after regeneration
+      if (!req.sessionID) {
+        console.error("Session ID still null after regeneration");
+        return res.status(500).json({ message: "Failed to create session ID" });
       }
-      
+
+      console.log("Creating guest user with session ID:", req.sessionID);
+
       const guestUser = await storage.upsertUser({
         id: guestId,
         email: undefined,
@@ -50,43 +63,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastName: "Player",
         profileImageUrl: undefined,
       });
-      
-      // Create a session for the guest user
-      const guestSession = {
-        claims: {
-          sub: guestId,
-          email: undefined,
-          first_name: "Guest",
-          last_name: "Player",
-          profile_image_url: undefined,
-          exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // 24 hours from now
-        },
-        access_token: `guest_token_${guestId}`,
-        refresh_token: null,
-        expires_at: Math.floor(Date.now() / 1000) + (24 * 60 * 60),
-      };
-      
-      // Store the session data
-      req.session.passport = { user: guestSession };
-      
-      // Force session save
-      await new Promise<void>((resolve, reject) => {
-        req.session.save((err: any) => {
-          if (err) {
-            console.error("Error saving guest session:", err);
-            reject(err);
-          } else {
-            resolve();
+
+      // Save guest user to session
+      req.session.passport = { user: guestUser.id };
+
+      // Force save the session with retry logic
+      let saveAttempts = 0;
+      const maxAttempts = 3;
+
+      while (saveAttempts < maxAttempts) {
+        try {
+          await new Promise<void>((resolve, reject) => {
+            req.session.save((err: any) => {
+              if (err) {
+                reject(err);
+              } else {
+                resolve();
+              }
+            });
+          });
+          console.log("Guest session saved successfully");
+          break;
+        } catch (saveError) {
+          saveAttempts++;
+          console.error(`Error saving guest session (attempt ${saveAttempts}):`, saveError);
+
+          if (saveAttempts >= maxAttempts) {
+            throw saveError;
           }
-        });
-      });
-      
+
+          // Wait a bit before retrying
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+
       res.json(guestUser);
     } catch (error) {
       console.error("Error creating guest user:", error);
-      if (!res.headersSent) {
-        res.status(500).json({ message: "Failed to create guest session" });
-      }
+      res.status(500).json({ message: "Failed to create guest session" });
     }
   });
 
@@ -95,14 +109,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const gameData = insertGameSchema.parse(req.body);
-      
+
       const game = await storage.createGame({
         ...gameData,
         whitePlayerId: userId,
         whiteTimeRemaining: gameData.timeControl || 600,
         blackTimeRemaining: gameData.timeControl || 600,
       });
-      
+
       res.json(game);
     } catch (error) {
       console.error("Error creating game:", error);
@@ -115,9 +129,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { difficulty = 'medium', timeControl = 600, playerColor = 'white' } = req.body;
-      
+
       const botId = `bot_${difficulty}_${Date.now()}`;
-      
+
       const game = await storage.createGame({
         whitePlayerId: playerColor === 'white' ? userId : botId,
         blackPlayerId: playerColor === 'white' ? botId : userId,
@@ -125,15 +139,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         whiteTimeRemaining: timeControl,
         blackTimeRemaining: timeControl,
       });
-      
+
       // If bot is white, make first move
       if (playerColor === 'black') {
         const bot = new ChessBot(difficulty);
         const botMove = bot.getBestMove("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-        
+
         const chess = new Chess();
         const move = chess.move(botMove.move);
-        
+
         if (move) {
           await storage.addGameMove({
             gameId: game._id?.toString() || game.id,
@@ -142,7 +156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             fen: chess.fen(),
             timeRemaining: timeControl,
           });
-          
+
           await storage.updateGame(game._id?.toString() || game.id, {
             fen: chess.fen(),
             currentTurn: 'black',
@@ -150,7 +164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       }
-      
+
       res.json(game);
     } catch (error) {
       console.error("Error creating bot game:", error);
@@ -161,17 +175,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/games/:id', isAuthenticated, async (req, res) => {
     try {
       const gameId = req.params.id;
-      
+
       if (!gameId || gameId === 'undefined') {
         return res.status(400).json({ message: "Invalid game ID" });
       }
-      
+
       const game = await storage.getGameWithPlayers(gameId);
-      
+
       if (!game) {
         return res.status(404).json({ message: "Game not found" });
       }
-      
+
       res.json(game);
     } catch (error) {
       console.error("Error fetching game:", error);
@@ -195,15 +209,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const gameId = req.params.id;
       const userId = req.user.claims.sub;
-      
+
       if (!gameId || gameId === 'undefined') {
         return res.status(400).json({ message: "Invalid game ID" });
       }
-      
+
       if (!req.body.move || !req.body.moveNumber || !req.body.fen) {
         return res.status(400).json({ message: "Missing required move data" });
       }
-      
+
       const moveData = insertGameMoveSchema.parse({
         gameId,
         moveNumber: req.body.moveNumber,
@@ -211,36 +225,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fen: req.body.fen,
         timeRemaining: req.body.timeRemaining,
       });
-      
+
       // Get current game state
       const game = await storage.getGame(gameId);
       if (!game) {
         return res.status(404).json({ message: "Game not found" });
       }
-      
+
       // Verify it's the player's turn
       const isWhitePlayer = game.whitePlayerId === userId;
       const isBlackPlayer = game.blackPlayerId === userId;
-      
+
       if (!isWhitePlayer && !isBlackPlayer) {
         return res.status(403).json({ message: "Not a player in this game" });
       }
-      
+
       const isPlayerTurn = (game.currentTurn === 'white' && isWhitePlayer) || 
                           (game.currentTurn === 'black' && isBlackPlayer);
-      
+
       if (!isPlayerTurn) {
         return res.status(400).json({ message: "Not your turn" });
       }
-      
+
       // Validate move with chess.js
       const chess = new Chess(game.fen || "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
       const move = chess.move(moveData.move);
-      
+
       if (!move) {
         return res.status(400).json({ message: "Invalid move" });
       }
-      
+
       // Add move to database
       const gameMove = await storage.addGameMove({
         gameId,
@@ -249,17 +263,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fen: chess.fen(),
         timeRemaining: moveData.timeRemaining,
       });
-      
+
       // Update game state
       const gameStatus = chess.isGameOver() ? 'completed' : 'active';
       let result = null;
-      
+
       if (chess.isCheckmate()) {
         result = game.currentTurn === 'white' ? 'black_wins' : 'white_wins';
       } else if (chess.isDraw() || chess.isStalemate()) {
         result = 'draw';
       }
-      
+
       const updatedGame = await storage.updateGame(gameId, {
         fen: chess.fen(),
         currentTurn: game.currentTurn === 'white' ? 'black' : 'white',
@@ -269,7 +283,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         whiteTimeRemaining: isWhitePlayer ? moveData.timeRemaining : game.whiteTimeRemaining,
         blackTimeRemaining: isBlackPlayer ? moveData.timeRemaining : game.blackTimeRemaining,
       });
-      
+
       // Update player stats if game is over
       if (result) {
         if (result === 'white_wins') {
@@ -295,22 +309,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
-      
+
       // Make bot move if it's bot's turn and game is still active
       let botMove = null;
       if (updatedGame.status === 'active') {
         const opponentId = updatedGame.currentTurn === 'white' ? 
           updatedGame.whitePlayerId : updatedGame.blackPlayerId;
-        
+
         if (opponentId && opponentId.startsWith('bot_')) {
           const difficulty = opponentId.split('_')[1] as 'easy' | 'medium' | 'hard';
           const bot = new ChessBot(difficulty);
-          
+
           try {
             const botMoveData = bot.getBestMove(updatedGame.fen);
             const chessForBot = new Chess(updatedGame.fen);
             const move = chessForBot.move(botMoveData.move);
-            
+
             if (move) {
               const botGameMove = await storage.addGameMove({
                 gameId: gameId,
@@ -320,16 +334,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 timeRemaining: updatedGame.currentTurn === 'white' ? 
                   updatedGame.whiteTimeRemaining : updatedGame.blackTimeRemaining,
               });
-              
+
               const botGameStatus = chessForBot.isGameOver() ? 'completed' : 'active';
               let botResult = null;
-              
+
               if (chessForBot.isCheckmate()) {
                 botResult = updatedGame.currentTurn === 'white' ? 'white_wins' : 'black_wins';
               } else if (chessForBot.isDraw() || chessForBot.isStalemate()) {
                 botResult = 'draw';
               }
-              
+
               const finalGame = await storage.updateGame(gameId, {
                 fen: chessForBot.fen(),
                 currentTurn: updatedGame.currentTurn === 'white' ? 'black' : 'white',
@@ -337,7 +351,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 status: botGameStatus,
                 result: botResult || undefined,
               });
-              
+
               botMove = { move: botGameMove, game: finalGame };
             }
           } catch (error) {
@@ -345,7 +359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
-      
+
       res.json({ 
         move: gameMove, 
         game: botMove ? botMove.game : updatedGame,
@@ -360,11 +374,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/games/:id/moves', isAuthenticated, async (req, res) => {
     try {
       const gameId = req.params.id;
-      
+
       if (!gameId || gameId === 'undefined') {
         return res.status(400).json({ message: "Invalid game ID" });
       }
-      
+
       const moves = await storage.getGameMoves(gameId);
       res.json(moves);
     } catch (error) {
@@ -378,24 +392,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const gameId = req.params.id;
       const userId = req.user.claims.sub;
-      
+
       const game = await storage.getGame(gameId);
       if (!game) {
         return res.status(404).json({ message: "Game not found" });
       }
-      
+
       const isPlayer = game.whitePlayerId === userId || game.blackPlayerId === userId;
       if (!isPlayer) {
         return res.status(403).json({ message: "Not a player in this game" });
       }
-      
+
       const result = game.whitePlayerId === userId ? 'black_wins' : 'white_wins';
-      
+
       const updatedGame = await storage.updateGame(gameId, {
         status: 'completed',
         result: result,
       });
-      
+
       // Update player stats
       if (result === 'white_wins') {
         if (game.whitePlayerId && !game.whitePlayerId.startsWith('bot_')) {
@@ -412,7 +426,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.updateUserStats(game.whitePlayerId, 'loss');
         }
       }
-      
+
       res.json(updatedGame);
     } catch (error) {
       console.error("Error resigning game:", error);
@@ -424,17 +438,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const gameId = req.params.id;
       const userId = req.user.claims.sub;
-      
+
       const game = await storage.getGame(gameId);
       if (!game) {
         return res.status(404).json({ message: "Game not found" });
       }
-      
+
       const isPlayer = game.whitePlayerId === userId || game.blackPlayerId === userId;
       if (!isPlayer) {
         return res.status(403).json({ message: "Not a player in this game" });
       }
-      
+
       // For now, just return success. In a full implementation, you'd store the draw offer
       res.json({ message: "Draw offer sent" });
     } catch (error) {
@@ -448,17 +462,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const gameId = req.params.id;
       const userId = req.user.claims.sub;
-      
+
       if (!gameId || gameId === 'undefined') {
         return res.status(400).json({ message: "Invalid game ID" });
       }
-      
+
       const messageData = insertChatMessageSchema.parse({
         gameId,
         playerId: userId,
         message: req.body.message,
       });
-      
+
       const chatMessage = await storage.addChatMessage(messageData);
       res.json(chatMessage);
     } catch (error) {
@@ -487,14 +501,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timeControl: req.body.timeControl || 600,
         ratingRange: req.body.ratingRange || 200,
       });
-      
+
       // Check for existing opponent
       const opponent = await storage.findMatchmakingOpponent(
         userId,
         entryData.timeControl!,
         entryData.ratingRange!
       );
-      
+
       if (opponent) {
         // Create game with found opponent
         const game = await storage.createGame({
@@ -504,11 +518,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           whiteTimeRemaining: entryData.timeControl,
           blackTimeRemaining: entryData.timeControl,
         });
-        
+
         // Remove both players from queue
         await storage.removeFromMatchmaking(userId);
         await storage.removeFromMatchmaking(opponent.playerId);
-        
+
         res.json({ 
           matched: true, 
           game: { 
