@@ -9,9 +9,10 @@ interface ChessBoardProps {
   isPlayerTurn: boolean;
   gameStatus: string;
   fen: string;
+  timeRemaining?: number;
 }
 
-export default function ChessBoard({ gameId, fen, orientation, isPlayerTurn, gameStatus }: ChessBoardProps) {
+export default function ChessBoard({ gameId, fen, orientation, isPlayerTurn, gameStatus, timeRemaining = 600 }: ChessBoardProps) {
   const [chess] = useState(() => new Chess());
   const [board, setBoard] = useState<Square[][]>([]);
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
@@ -20,7 +21,7 @@ export default function ChessBoard({ gameId, fen, orientation, isPlayerTurn, gam
   const { toast } = useToast();
 
   const moveMutation = useMutation({
-    mutationFn: async ({ from, to }: { from: string; to: string }) => {
+    mutationFn: async ({ from, to, timeRemaining }: { from: string; to: string; timeRemaining: number }) => {
       const response = await fetch(`/api/games/${gameId}/moves`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -29,7 +30,7 @@ export default function ChessBoard({ gameId, fen, orientation, isPlayerTurn, gam
           move: from + to,
           moveNumber: chess.history().length + 1,
           fen: chess.fen(),
-          timeRemaining: 600, // Default time
+          timeRemaining: timeRemaining,
         }),
       });
 
@@ -103,7 +104,7 @@ export default function ChessBoard({ gameId, fen, orientation, isPlayerTurn, gam
       // Make move
       const move = chess.move({ from: selectedSquare, to: square });
       if (move) {
-        moveMutation.mutate({ from: selectedSquare, to: square });
+        moveMutation.mutate({ from: selectedSquare, to: square, timeRemaining });
       }
       return;
     }

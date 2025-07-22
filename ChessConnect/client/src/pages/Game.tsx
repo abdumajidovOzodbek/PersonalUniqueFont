@@ -190,6 +190,7 @@ export default function Game() {
                       (gameData.currentTurn === 'black' && isBlackPlayer)
                     }
                     gameStatus={gameData.status}
+                    timeRemaining={isWhitePlayer ? gameData.whiteTimeRemaining : gameData.blackTimeRemaining}
                   />
                 </div>
 
