@@ -47,6 +47,9 @@ export interface IStorage {
   // User stats
   updateUserStats(userId: string, result: 'win' | 'loss' | 'draw'): Promise<void>;
   
+  // Leaderboard
+  getLeaderboard(limit: number): Promise<User[]>;
+  
   // Draw offers
   addDrawOffer(gameId: string, playerId: string): Promise<void>;
   getDrawOffers(gameId: string, fromPlayerId?: string): Promise<any[]>;
@@ -333,6 +336,30 @@ export class DatabaseStorage implements IStorage {
     }
 
     await UserModel.updateOne({ id: userId }, updates).exec();
+  }
+
+  // Leaderboard
+  async getLeaderboard(limit: number): Promise<User[]> {
+    const users = await UserModel
+      .find({
+        gamesPlayed: { $gt: 0 }, // Only include users who have played at least one game
+        id: { $not: /^guest_/ } // Exclude guest users from leaderboard
+      })
+      .sort({ rating: -1, gamesPlayed: -1 }) // Sort by rating desc, then by games played desc
+      .limit(limit)
+      .exec();
+
+    return users.map(user => {
+      const userObj = user.toObject();
+      return {
+        ...userObj,
+        _id: userObj._id.toString(),
+        email: userObj.email || undefined,
+        firstName: userObj.firstName || undefined,
+        lastName: userObj.lastName || undefined,
+        profileImageUrl: userObj.profileImageUrl || undefined,
+      } as User;
+    });
   }
 
   // Draw offers

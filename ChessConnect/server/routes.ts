@@ -669,6 +669,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Leaderboard route
+  app.get('/api/leaderboard', isAuthenticated, async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const leaderboard = await storage.getLeaderboard(limit);
+      res.json(leaderboard);
+    } catch (error) {
+      console.error("Error fetching leaderboard:", error);
+      res.status(500).json({ message: "Failed to fetch leaderboard" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -402,7 +402,11 @@ export default function Home() {
                     <Target className="w-4 h-4 mr-2" />
                     Daily Puzzles
                   </Button>
-                  <Button variant="outline" className="w-full justify-start">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={() => setLocation('/leaderboard')}
+                  >
                     <Trophy className="w-4 h-4 mr-2" />
                     Leaderboard
                   </Button>

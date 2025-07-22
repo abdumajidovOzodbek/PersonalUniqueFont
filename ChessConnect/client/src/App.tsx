@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Landing from "@/pages/Landing";
 import Home from "@/pages/Home";
 import Game from "@/pages/Game";
+import LeaderboardPage from "@/pages/Leaderboard";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -23,6 +24,7 @@ function Router() {
         <>
           <Route path="/" component={Home} />
           <Route path="/game/:id" component={Game} />
+          <Route path="/leaderboard" component={LeaderboardPage} />
         </>
       )}
       <Route component={NotFound} />
