@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import Navigation from "@/components/Navigation";
-import { User, Settings, Upload, Save } from "lucide-react";
+import { User, Settings, Upload, Save, Camera } from "lucide-react";
 
 export default function Profile() {
   const { user } = useAuth();
@@ -20,6 +20,9 @@ export default function Profile() {
   const [firstName, setFirstName] = useState(user?.firstName || "");
   const [lastName, setLastName] = useState(user?.lastName || "");
   const [profileImageUrl, setProfileImageUrl] = useState(user?.profileImageUrl || "");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const updateUsernameMutation = useMutation({
     mutationFn: async (data: { firstName: string; lastName: string }) => {
@@ -39,6 +42,52 @@ export default function Profile() {
         description: error.message || "Failed to update name. Please try again.",
         variant: "destructive",
       });
+    },
+  });
+
+  const uploadImageMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('image', file);
+      
+      const response = await fetch('/api/upload/profile-image', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Upload failed');
+      }
+      
+      return response.json();
+    },
+    onSuccess: async (data) => {
+      // Update user profile with the new image URL
+      const response = await apiRequest("PUT", "/api/profile/picture", {
+        profileImageUrl: data.imageUrl,
+      });
+      const updatedUser = await response.json();
+      
+      queryClient.setQueryData(["/api/auth/user"], updatedUser);
+      setProfileImageUrl(data.imageUrl);
+      setSelectedFile(null);
+      setPreviewUrl(null);
+      
+      toast({
+        title: "Success",
+        description: "Your profile picture has been updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to upload image. Please try again.",
+        variant: "destructive",
+      });
+      setSelectedFile(null);
+      setPreviewUrl(null);
     },
   });
 
@@ -62,6 +111,54 @@ export default function Profile() {
       });
     },
   });
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Error",
+        description: "Please select an image file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "Error",
+        description: "Image size must be less than 5MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSelectedFile(file);
+    
+    // Create preview URL
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setPreviewUrl(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUploadImage = () => {
+    if (selectedFile) {
+      uploadImageMutation.mutate(selectedFile);
+    }
+  };
+
+  const handleCancelUpload = () => {
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const handleUpdateUsername = (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,17 +211,64 @@ export default function Profile() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-center">
-                  <Avatar className="w-32 h-32">
-                    <AvatarImage src={profileImageUrl || user?.profileImageUrl} />
-                    <AvatarFallback className="text-2xl">
-                      {firstName.charAt(0).toUpperCase() || user?.firstName?.charAt(0).toUpperCase() || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
+                  <div className="relative">
+                    <Avatar className="w-32 h-32">
+                      <AvatarImage src={previewUrl || profileImageUrl || user?.profileImageUrl} />
+                      <AvatarFallback className="text-2xl">
+                        {firstName.charAt(0).toUpperCase() || user?.firstName?.charAt(0).toUpperCase() || 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="absolute bottom-0 right-0 rounded-full w-10 h-10 bg-blue-600 hover:bg-blue-700"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Camera className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
+
+                {selectedFile && (
+                  <div className="space-y-3">
+                    <div className="text-sm text-gray-600 text-center">
+                      Selected: {selectedFile.name}
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button
+                        type="button"
+                        onClick={handleUploadImage}
+                        disabled={uploadImageMutation.isPending}
+                        className="flex-1"
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        {uploadImageMutation.isPending ? "Uploading..." : "Upload Image"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleCancelUpload}
+                        disabled={uploadImageMutation.isPending}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                
+                <Separator />
                 
                 <form onSubmit={handleUpdateProfilePicture} className="space-y-4">
                   <div>
-                    <Label htmlFor="profileImageUrl">Image URL</Label>
+                    <Label htmlFor="profileImageUrl">Or use Image URL</Label>
                     <Input
                       id="profileImageUrl"
                       type="url"
@@ -142,9 +286,10 @@ export default function Profile() {
                     type="submit"
                     disabled={updateProfilePictureMutation.isPending || !isProfilePictureChanged}
                     className="w-full"
+                    variant="outline"
                   >
                     <Save className="w-4 h-4 mr-2" />
-                    {updateProfilePictureMutation.isPending ? "Updating..." : "Update Picture"}
+                    {updateProfilePictureMutation.isPending ? "Updating..." : "Update from URL"}
                   </Button>
                 </form>
               </CardContent>

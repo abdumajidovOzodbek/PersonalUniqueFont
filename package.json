@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@replit/object-storage": "^1.0.0",
+    "@types/multer": "^2.0.0",
+    "multer": "^2.0.2"
+  }
+}

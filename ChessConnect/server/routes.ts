@@ -10,8 +10,29 @@ import {
 } from "@shared/schema";
 import { Chess } from "chess.js";
 import { ChessBot } from "./bot";
+import multer from "multer";
+import { Client } from "@replit/object-storage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Configure multer for file uploads
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 5 * 1024 * 1024, // 5MB limit
+    },
+    fileFilter: (req, file, cb) => {
+      // Only allow image files
+      if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only image files are allowed'));
+      }
+    },
+  });
+
+  // Initialize Object Storage client
+  const objectStorageClient = new Client();
+
   // Auth middleware
   await setupAuth(app);
 
@@ -671,6 +692,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Image upload route
+  app.post('/api/upload/profile-image', isAuthenticated, upload.single('image'), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "No image file provided" });
+      }
+
+      const userId = req.user.claims.sub;
+      const fileExtension = req.file.originalname.split('.').pop() || 'jpg';
+      const fileName = `profile-images/${userId}-${Date.now()}.${fileExtension}`;
+
+      // Upload to Object Storage
+      const { ok, error } = await objectStorageClient.uploadFromBytes(fileName, req.file.buffer);
+
+      if (!ok) {
+        console.error("Error uploading to Object Storage:", error);
+        return res.status(500).json({ message: "Failed to upload image" });
+      }
+
+      // Generate the URL for the uploaded image
+      const imageUrl = `/api/images/${fileName}`;
+
+      res.json({ imageUrl });
+    } catch (error) {
+      console.error("Error uploading profile image:", error);
+      res.status(500).json({ message: "Failed to upload profile image" });
+    }
+  });
+
+  // Serve images from Object Storage
+  app.get('/api/images/*', async (req, res) => {
+    try {
+      const fileName = req.params[0];
+      
+      // Download from Object Storage
+      const { ok, value, error } = await objectStorageClient.downloadAsBytes(fileName);
+
+      if (!ok) {
+        return res.status(404).json({ message: "Image not found" });
+      }
+
+      // Set appropriate content type
+      const extension = fileName.split('.').pop()?.toLowerCase();
+      let contentType = 'image/jpeg'; // default
+      
+      switch (extension) {
+        case 'png':
+          contentType = 'image/png';
+          break;
+        case 'gif':
+          contentType = 'image/gif';
+          break;
+        case 'webp':
+          contentType = 'image/webp';
+          break;
+        default:
+          contentType = 'image/jpeg';
+      }
+
+      res.set('Content-Type', contentType);
+      res.set('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+      res.send(value);
+    } catch (error) {
+      console.error("Error serving image:", error);
+      res.status(500).json({ message: "Failed to serve image" });
+    }
+  });
+
   // Profile update routes
   app.put('/api/profile/username', isAuthenticated, async (req: any, res) => {
     try {
@@ -704,13 +793,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!profileImageUrl || typeof profileImageUrl !== 'string') {
         return res.status(400).json({ message: "Valid profile image URL is required" });
-      }
-
-      // Basic URL validation
-      try {
-        new URL(profileImageUrl);
-      } catch {
-        return res.status(400).json({ message: "Invalid URL format" });
       }
 
       const updatedUser = await storage.updateUserProfile(userId, {
