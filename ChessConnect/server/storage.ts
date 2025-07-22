@@ -22,38 +22,44 @@ export interface IStorage {
   // User operations (required for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
-  
+
   // Game operations
   createGame(game: InsertGame): Promise<Game>;
   getGame(id: string): Promise<Game | undefined>;
   getGameWithPlayers(id: string): Promise<Game & { whitePlayer: User | null; blackPlayer: User | null } | undefined>;
   updateGame(id: string, updates: Partial<InsertGame>): Promise<Game>;
   getUserGames(userId: string, limit?: number, page?: number): Promise<Game[]>;
-  
+
   // Game move operations
   addGameMove(move: InsertGameMove): Promise<GameMove>;
   getGameMoves(gameId: string): Promise<GameMove[]>;
-  
+
   // Chat operations
   addChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   getChatMessages(gameId: string): Promise<(ChatMessage & { player: User })[]>;
-  
+
   // Matchmaking operations
   addToMatchmaking(entry: InsertMatchmakingEntry): Promise<MatchmakingEntry>;
   findMatchmakingOpponent(playerId: string, timeControl: number, ratingRange: number): Promise<MatchmakingEntry | undefined>;
   removeFromMatchmaking(playerId: string): Promise<void>;
   isPlayerInQueue(playerId: string): Promise<boolean>;
-  
+
   // User stats
   updateUserStats(userId: string, result: 'win' | 'loss' | 'draw'): Promise<void>;
-  
+
   // Leaderboard
   getLeaderboard(limit: number): Promise<User[]>;
-  
+
   // Draw offers
   addDrawOffer(gameId: string, playerId: string): Promise<void>;
   getDrawOffers(gameId: string, fromPlayerId?: string): Promise<any[]>;
   removeDrawOffers(gameId: string): Promise<void>;
+
+   // User profile operations
+   updateUserProfile(
+    userId: string,
+    updates: Partial<Pick<User, "firstName" | "lastName" | "profileImageUrl">>
+  ): Promise<User>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -164,11 +170,11 @@ export class DatabaseStorage implements IStorage {
       { ...updates, updatedAt: new Date() },
       { new: true }
     ).exec();
-    
+
     if (!updatedGame) {
       throw new Error('Game not found');
     }
-    
+
     const gameObj = updatedGame.toObject();
     return {
       ...gameObj,
@@ -189,7 +195,7 @@ export class DatabaseStorage implements IStorage {
       .skip(skip)
       .limit(limit)
       .exec();
-      
+
     return games.map(game => {
       const gameObj = game.toObject();
       return {
@@ -216,7 +222,7 @@ export class DatabaseStorage implements IStorage {
       .find({ gameId })
       .sort({ moveNumber: 1 })
       .exec();
-      
+
     return moves.map(move => {
       const moveObj = move.toObject();
       return {
@@ -299,7 +305,7 @@ export class DatabaseStorage implements IStorage {
       .exec();
 
     if (!opponent) return undefined;
-    
+
     const opponentObj = opponent.toObject();
     return {
       ...opponentObj,
@@ -341,7 +347,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Leaderboard
-  async getLeaderboard(limit: number): Promise<User[]> {
+  async getLeaderboard(limit: number = 50): Promise<User[]> {
     const users = await UserModel
       .find({
         gamesPlayed: { $gt: 0 }, // Only include users who have played at least one game
@@ -363,27 +369,29 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  // Draw offers
-  async addDrawOffer(gameId: string, playerId: string): Promise<void> {
-    await DrawOfferModel.findOneAndUpdate(
-      { gameId, playerId },
-      { gameId, playerId, createdAt: new Date() },
-      { upsert: true }
+  async updateUserProfile(userId: string, updates: Partial<Pick<User, 'firstName' | 'lastName' | 'profileImageUrl'>>): Promise<User> {
+    const user = await UserModel.findOneAndUpdate(
+      { id: userId },
+      { 
+        ...updates,
+        updatedAt: new Date()
+      },
+      { new: true }
     ).exec();
-  }
 
-  async getDrawOffers(gameId: string, fromPlayerId?: string): Promise<any[]> {
-    const query: any = { gameId };
-    if (fromPlayerId) {
-      query.playerId = fromPlayerId;
+    if (!user) {
+      throw new Error("User not found");
     }
-    
-    const offers = await DrawOfferModel.find(query).exec();
-    return offers.map(offer => offer.toObject());
-  }
 
-  async removeDrawOffers(gameId: string): Promise<void> {
-    await DrawOfferModel.deleteMany({ gameId }).exec();
+    const userObj = user.toObject();
+    return {
+      ...userObj,
+      _id: userObj._id.toString(),
+      email: userObj.email || undefined,
+      firstName: userObj.firstName || undefined,
+      lastName: userObj.lastName || undefined,
+      profileImageUrl: userObj.profileImageUrl || undefined,
+    } as User;
   }
 }
 

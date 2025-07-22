@@ -671,6 +671,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Profile update routes
+  app.put('/api/profile/username', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { firstName, lastName } = req.body;
+
+      if (!firstName || firstName.trim().length === 0) {
+        return res.status(400).json({ message: "First name is required" });
+      }
+
+      if (firstName.trim().length > 50 || (lastName && lastName.trim().length > 50)) {
+        return res.status(400).json({ message: "Names must be 50 characters or less" });
+      }
+
+      const updatedUser = await storage.updateUserProfile(userId, {
+        firstName: firstName.trim(),
+        lastName: lastName ? lastName.trim() : undefined,
+      });
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating username:", error);
+      res.status(500).json({ message: "Failed to update username" });
+    }
+  });
+
+  app.put('/api/profile/picture', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { profileImageUrl } = req.body;
+
+      if (!profileImageUrl || typeof profileImageUrl !== 'string') {
+        return res.status(400).json({ message: "Valid profile image URL is required" });
+      }
+
+      // Basic URL validation
+      try {
+        new URL(profileImageUrl);
+      } catch {
+        return res.status(400).json({ message: "Invalid URL format" });
+      }
+
+      const updatedUser = await storage.updateUserProfile(userId, {
+        profileImageUrl,
+      });
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating profile picture:", error);
+      res.status(500).json({ message: "Failed to update profile picture" });
+    }
+  });
+
   // Leaderboard route
   app.get('/api/leaderboard', isAuthenticated, async (req, res) => {
     try {

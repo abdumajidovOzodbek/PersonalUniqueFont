@@ -1,3 +1,6 @@
+The code adds a profile settings link to the navigation dropdown menu.
+```
+```replit_final_file
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
@@ -57,13 +60,13 @@ export default function Navigation() {
               </button>
             </div>
           </div>
-          
+
           <div className="flex items-center space-x-4">
             <Button onClick={handleQuickPlay} className="bg-green-600 hover:bg-green-700 hidden sm:inline-flex">
               <Play className="w-4 h-4 mr-2" />
               Quick Play
             </Button>
-            
+
             {user && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -100,9 +103,8 @@ export default function Navigation() {
                     </div>
                   </div>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setLocation("/")}>
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
+                  <DropdownMenuItem onClick={() => setLocation('/profile')}>
+                    Profile Settings
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleQuickPlay}>
                     <Play className="mr-2 h-4 w-4" />
