@@ -34,13 +34,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   let objectStorageClient: Client | null = null;
   try {
     // Check if bucket is configured
-    const fs = require('fs');
-    const path = require('path');
-    const replitConfigPath = path.join(process.cwd(), '.replit');
+    const { readFileSync, existsSync } = await import('fs');
+    const { join } = await import('path');
+    const replitConfigPath = join(process.cwd(), '.replit');
     
     let hasBucketConfig = false;
-    if (fs.existsSync(replitConfigPath)) {
-      const configContent = fs.readFileSync(replitConfigPath, 'utf8');
+    if (existsSync(replitConfigPath)) {
+      const configContent = readFileSync(replitConfigPath, 'utf8');
       hasBucketConfig = configContent.includes('[objectStorage]') && configContent.includes('defaultBucketID');
     }
     
