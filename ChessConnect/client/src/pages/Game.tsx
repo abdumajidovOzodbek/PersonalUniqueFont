@@ -16,7 +16,7 @@ import type { Game, User } from "@shared/schema";
 export default function Game() {
   const params = useParams();
   const gameId = params.id;
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
 
   // Add comprehensive validation for gameId
   const isValidGameId = gameId && gameId !== 'undefined' && gameId !== 'null' && gameId.length > 0;
