@@ -32,8 +32,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const guestId = `guest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
+      // Ensure session exists - if not, create one
+      if (!req.session) {
+        return res.status(500).json({ message: "Session not initialized" });
+      }
+      
       // Destroy existing session if it exists to prevent conflicts
-      if (req.session) {
+      if (req.session.passport) {
         await new Promise<void>((resolve) => {
           req.session.destroy((err: any) => {
             if (err) {
@@ -42,19 +47,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             resolve();
           });
         });
-      }
-      
-      // Create new session
-      await new Promise<void>((resolve, reject) => {
-        req.session.regenerate((err: any) => {
-          if (err) {
-            console.error("Error regenerating session:", err);
-            reject(err);
-          } else {
-            resolve();
-          }
+        
+        // Regenerate session after destruction
+        await new Promise<void>((resolve, reject) => {
+          req.session.regenerate((err: any) => {
+            if (err) {
+              console.error("Error regenerating session:", err);
+              reject(err);
+            } else {
+              resolve();
+            }
+          });
         });
-      });
+      }
       
       const guestUser = await storage.upsertUser({
         id: guestId,
