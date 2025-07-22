@@ -18,11 +18,31 @@ export default function Navigation() {
   const [, setLocation] = useLocation();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
+  const handleNavigation = (path: string) => {
+    // Check if user is currently in an active game
+    const currentPath = window.location.pathname;
+    if (currentPath.includes('/game/')) {
+      const confirmLeave = window.confirm('You are currently in an active game. If you leave now, you will lose the game. Are you sure you want to leave?');
+      if (!confirmLeave) {
+        return;
+      }
+    }
+    setLocation(path);
+  };
+
   const handleLogout = () => {
     window.location.href = "/api/logout";
   };
 
   const handleQuickPlay = () => {
+    // Check if user is currently in an active game
+    const currentPath = window.location.pathname;
+    if (currentPath.includes('/game/')) {
+      const confirmLeave = window.confirm('You are currently in an active game. If you leave now, you will lose the game. Are you sure you want to leave?');
+      if (!confirmLeave) {
+        return;
+      }
+    }
     setLocation("/");
   };
 
@@ -33,7 +53,7 @@ export default function Navigation() {
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <button
-                onClick={() => setLocation("/")}
+                onClick={() => handleNavigation("/")}
                 className="text-2xl font-bold text-green-600 hover:text-green-700 transition-colors"
               >
                 <Sword className="inline-block w-8 h-8 mr-2" />
@@ -42,7 +62,7 @@ export default function Navigation() {
             </div>
             <div className="hidden md:ml-8 md:flex md:space-x-8">
               <button
-                onClick={() => setLocation("/")}
+                onClick={() => handleNavigation("/")}
                 className="text-gray-700 hover:text-green-600 px-3 py-2 text-sm font-medium transition-colors"
               >
                 Play
@@ -101,7 +121,7 @@ export default function Navigation() {
                     </div>
                   </div>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setLocation('/profile')}>
+                  <DropdownMenuItem onClick={() => handleNavigation('/profile')}>
                     Profile Settings
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleQuickPlay}>
@@ -137,7 +157,7 @@ export default function Navigation() {
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-white border-t border-gray-200">
             <button
               onClick={() => {
-                setLocation("/");
+                handleNavigation("/");
                 setShowMobileMenu(false);
               }}
               className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-green-600 hover:bg-gray-50 w-full text-left"

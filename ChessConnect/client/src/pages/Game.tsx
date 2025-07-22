@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useParams } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -17,6 +17,7 @@ export default function Game() {
   const params = useParams();
   const gameId = params.id;
   const { user, isLoading: authLoading } = useAuth();
+  const [, setLocation] = useLocation();
 
   // Add comprehensive validation for gameId
   const isValidGameId = gameId && gameId !== 'undefined' && gameId !== 'null' && gameId.length > 0;
@@ -77,6 +78,54 @@ export default function Game() {
       }, 500);
     }
   }, [gameError, toast]);
+
+  // Prevent user from leaving active game without warning
+  useEffect(() => {
+    if (!game || game.status !== 'active') return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = 'You are currently in an active game. If you leave now, you will lose the game. Are you sure you want to leave?';
+      return 'You are currently in an active game. If you leave now, you will lose the game. Are you sure you want to leave?';
+    };
+
+    const handlePopState = (e: PopStateEvent) => {
+      if (game.status === 'active') {
+        const confirmLeave = window.confirm('You are currently in an active game. If you leave now, you will lose the game. Are you sure you want to leave?');
+        if (!confirmLeave) {
+          e.preventDefault();
+          window.history.pushState(null, '', window.location.href);
+          return;
+        }
+        // If user confirms, they will lose the game
+        handleGameExit();
+      }
+    };
+
+    const handleGameExit = async () => {
+      try {
+        // Resign the game when user leaves
+        await fetch(`/api/games/${gameId}/resign`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+      } catch (error) {
+        console.error('Error resigning game on exit:', error);
+      }
+    };
+
+    // Add event listeners
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('popstate', handlePopState);
+
+    // Push current state to history to catch back button
+    window.history.pushState(null, '', window.location.href);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [game, gameId]);
 
 
   if (authLoading || gameLoading) {
