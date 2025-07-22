@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -16,7 +15,7 @@ import { User, Settings, Upload, Save, Camera } from "lucide-react";
 export default function Profile() {
   const { user } = useAuth();
   const { toast } = useToast();
-  
+
   const [firstName, setFirstName] = useState(user?.firstName || "");
   const [lastName, setLastName] = useState(user?.lastName || "");
   const [profileImageUrl, setProfileImageUrl] = useState(user?.profileImageUrl || "");
@@ -49,18 +48,18 @@ export default function Profile() {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append('image', file);
-      
+
       const response = await fetch('/api/upload/profile-image', {
         method: 'POST',
         body: formData,
         credentials: 'include',
       });
-      
+
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || 'Upload failed');
       }
-      
+
       return response.json();
     },
     onSuccess: async (data) => {
@@ -69,12 +68,12 @@ export default function Profile() {
         profileImageUrl: data.imageUrl,
       });
       const updatedUser = await response.json();
-      
+
       queryClient.setQueryData(["/api/auth/user"], updatedUser);
       setProfileImageUrl(data.imageUrl);
       setSelectedFile(null);
       setPreviewUrl(null);
-      
+
       toast({
         title: "Success",
         description: "Your profile picture has been updated successfully.",
@@ -137,7 +136,7 @@ export default function Profile() {
     }
 
     setSelectedFile(file);
-    
+
     // Create preview URL
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -192,7 +191,7 @@ export default function Profile() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation />
-      
+
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">Profile Settings</h1>
@@ -263,9 +262,9 @@ export default function Profile() {
                     </div>
                   </div>
                 )}
-                
+
                 <Separator />
-                
+
                 <form onSubmit={handleUpdateProfilePicture} className="space-y-4">
                   <div>
                     <Label htmlFor="profileImageUrl">Or use Image URL</Label>
@@ -281,7 +280,7 @@ export default function Profile() {
                       Enter the URL of your profile picture
                     </p>
                   </div>
-                  
+
                   <Button
                     type="submit"
                     disabled={updateProfilePictureMutation.isPending || !isProfilePictureChanged}
@@ -321,7 +320,7 @@ export default function Profile() {
                         required
                       />
                     </div>
-                    
+
                     <div>
                       <Label htmlFor="lastName">Last Name</Label>
                       <Input
@@ -335,7 +334,7 @@ export default function Profile() {
                       />
                     </div>
                   </div>
-                  
+
                   <Button
                     type="submit"
                     disabled={updateUsernameMutation.isPending || !isUsernameChanged}
@@ -350,7 +349,7 @@ export default function Profile() {
                 {/* Account Information */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium">Account Information</h3>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="text-sm font-medium text-gray-500">User ID</Label>
@@ -358,21 +357,21 @@ export default function Profile() {
                         {user?.id}
                       </p>
                     </div>
-                    
+
                     <div>
                       <Label className="text-sm font-medium text-gray-500">Email</Label>
                       <p className="text-sm text-gray-900">
                         {user?.email || "Not provided"}
                       </p>
                     </div>
-                    
+
                     <div>
                       <Label className="text-sm font-medium text-gray-500">Member Since</Label>
                       <p className="text-sm text-gray-900">
                         {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : "Unknown"}
                       </p>
                     </div>
-                    
+
                     <div>
                       <Label className="text-sm font-medium text-gray-500">Current Rating</Label>
                       <p className="text-sm text-gray-900 font-bold text-blue-600">

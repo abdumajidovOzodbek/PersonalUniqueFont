@@ -33,7 +33,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize Object Storage client with error handling
   let objectStorageClient: Client | null = null;
   try {
-    objectStorageClient = new Client();
+    // Check if bucket is configured
+    const fs = require('fs');
+    const path = require('path');
+    const replitConfigPath = path.join(process.cwd(), '.replit');
+    
+    let hasBucketConfig = false;
+    if (fs.existsSync(replitConfigPath)) {
+      const configContent = fs.readFileSync(replitConfigPath, 'utf8');
+      hasBucketConfig = configContent.includes('[objectStorage]') && configContent.includes('defaultBucketID');
+    }
+    
+    if (hasBucketConfig) {
+      objectStorageClient = new Client();
+      console.log("Object Storage initialized successfully");
+    } else {
+      console.warn("Object Storage not configured. Please create a bucket in the Tools pane.");
+    }
   } catch (error) {
     console.warn("Object Storage not available:", error);
   }
@@ -701,7 +717,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/upload/profile-image', isAuthenticated, upload.single('image'), async (req: any, res) => {
     try {
       if (!objectStorageClient) {
-        return res.status(503).json({ message: "Object Storage not available. Please configure Object Storage in your Replit workspace." });
+        return res.status(503).json({ 
+          message: "Object Storage not available. Please create a bucket in Tools > Object Storage to enable profile image uploads." 
+        });
       }
 
       if (!req.file) {
