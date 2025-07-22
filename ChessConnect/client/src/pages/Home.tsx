@@ -152,28 +152,34 @@ function RecentGamesSection() {
             </div>
 
             {/* Pagination Controls */}
-            <div className="flex items-center justify-between mt-4 pt-4 border-t">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-              >
-                Previous
-              </Button>
+            <div className="flex items-center justify-center mt-4 pt-4 border-t gap-4">
+              {currentPage > 1 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  className="flex items-center gap-2"
+                >
+                  <History className="w-4 h-4" />
+                  Previous
+                </Button>
+              )}
               
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-gray-600 font-medium px-3 py-1 bg-gray-100 rounded-lg">
                 Page {currentPage}
               </span>
               
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => prev + 1)}
-                disabled={games.length < gamesPerPage}
-              >
-                Next
-              </Button>
+              {games.length === gamesPerPage && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => prev + 1)}
+                  className="flex items-center gap-2"
+                >
+                  Next
+                  <History className="w-4 h-4" />
+                </Button>
+              )}
             </div>
           </>
         )}
