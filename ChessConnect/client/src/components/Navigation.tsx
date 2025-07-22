@@ -1,6 +1,4 @@
-The code adds a profile settings link to the navigation dropdown menu.
-```
-```replit_final_file
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
